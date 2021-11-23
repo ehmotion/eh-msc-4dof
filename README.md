@@ -87,7 +87,7 @@ Position data: 2 bytes binary<br>
 Position encoding: 16bits<br>
 Check the screenshots for details on FlyPTMover settings.
 
-Position control range: 0 to 65534 - it gets mapped to actuator limits as detected on power on.<br>
+Position control range: 0 to 65535 - it gets mapped to actuator limits as detected on power on.<br>
 To avoid limit detection for each serial port access, use a 10uF capacitor between Arduino pins RESET and GND.<br>
 Note that it is no longer possible to upload the sketch on the Arduino while the capacitor is connected.<br>
 
