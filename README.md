@@ -42,6 +42,8 @@ Motor 4
  9              5Vcc
  5,10,14        GND
 ```
+!!!WARNING: failure to make the proper connections may result in broken actuators.<br>
+
 -the torque reach signal requires the following connection:
 ```
 CN2 DB25 pin 23 -- 2.2kohm resistor -- Arduino pin
@@ -92,3 +94,5 @@ To avoid limit detection for each serial port access, use a 10uF capacitor betwe
 Note that it is no longer possible to upload the sketch on the Arduino while the capacitor is connected.<br>
 
 Thanks to cubexvr! based on https://github.com/cubexvr/servoController
+
+ENJOY at your own risk!
