@@ -43,6 +43,8 @@ Motor 4
  5,10,14        GND
 ```
 !!!WARNING: failure to make the proper connections may result in broken actuators.<br>
+<br>
+!!!If this is your first time, try one actuator at a time in each port since it won't mind if any of them is not connected. Watch the serial console/monitor in Arduino IDE to follow what happens during limits detection (the LED flashes slowly).
 
 -the torque reach signal requires the following connection:
 ```
