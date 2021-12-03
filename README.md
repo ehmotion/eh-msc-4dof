@@ -49,7 +49,8 @@ Motor 4
 -the torque reach signal requires the following connection:
 ```
 CN2 DB25 pin 23 -- 2.2kohm resistor -- Arduino pin
-                \-- 0.1uF capacitor -- GND
+                \-- 0.1uF capacitor -- GND<br>
+(resistor between DB25 pin 23 and Arduino; capacitor between DB25 pin 23 and GND)
 ```
 The following parameters are required for the AASD 15A controller:<br>
 (push MOD until you see Pn000 to enter the parameter setup mode)
