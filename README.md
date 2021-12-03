@@ -90,7 +90,7 @@ Serial port configuration: 115200,8N1<br>
 Command speed frequency: 2ms<br>
 Position data: 2 bytes binary<br>
 Position encoding: 16bits<br>
-Check the screenshots for details on FlyPTMover settings.
+Check the screenshots for details on FlyPTMover / Simtools settings.
 
 Position control range: 0 to 65535 - it gets mapped to actuator limits as detected on power on.<br>
 To avoid limit detection for each serial port access, use a 10uF capacitor between Arduino pins RESET and GND.<br>
