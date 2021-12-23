@@ -108,11 +108,11 @@ const byte ena2p = A6;
 const byte ena3p = A7;
 
 //todo: move these to bitfield
-volatile byte safe0s = 0;
-volatile byte safe1s = 0;
-volatile byte safe2s = 0;
-volatile byte safe3s = 0;
-volatile byte safeOs = 0;
+volatile byte safe0s = LOW;
+volatile byte safe1s = LOW;
+volatile byte safe2s = LOW;
+volatile byte safe3s = LOW;
+volatile byte safeOs = LOW;
 
 //torque-reach 0 -> cn2 m0 p23
 const byte safe0p = 18;
@@ -205,6 +205,8 @@ volatile unsigned int motor_mins[] = {POS_HOME + RANGE_DZ, POS_HOME + RANGE_DZ,
   POS_HOME + RANGE_DZ, POS_HOME + RANGE_DZ};
 volatile unsigned int motor_maxs[] = {RANGE_SAFE - RANGE_DZ, RANGE_SAFE - RANGE_DZ,
   RANGE_SAFE - RANGE_DZ, RANGE_SAFE - RANGE_DZ};
+
+#define HOMING_INC 2
 
 void delay4int(int ms)
 {
@@ -340,11 +342,11 @@ void int_safetyOVR()
 void int_stop0()
 {
   debug_print ("#M0!");
-  debug_print (safeOs);
+  debug_print (safe0s);
   debug_print ("#");
-  if (safeOs == HIGH)
+  if (safe0s == HIGH)
     return;
-  safeOs = HIGH;
+  safe0s = HIGH;
   //digitalWrite(ena[0], HIGH);
   if (run_state == ST_HOMING)
     stopSignal[0] = true; //stop motor
@@ -359,7 +361,6 @@ void int_stop0()
   }
   #endif
   //debug_println ("M0SonL");
-  safeOs = LOW;
 }
 
 void int_stop1()
@@ -384,7 +385,6 @@ void int_stop1()
   }
   #endif
   //debug_println ("M1SonL");
-  safe1s = LOW;
 }
 
 void int_stop2()
@@ -409,7 +409,6 @@ void int_stop2()
   }
   #endif
   //debug_println ("M2SonL");
-  safe2s = LOW;
 }
 
 void int_stop3()
@@ -434,7 +433,6 @@ void int_stop3()
   }
   #endif
   //debug_println ("M3SonL");
-  safe3s = LOW;
 }
 
 void setup()
@@ -605,25 +603,25 @@ int homing_start()
   //M0
   if (motors > 0)
   {
-    targetInput[0] = POS_MAXI; //mapToRange(POS_MAXI);
+    targetInput[0] = HOMING_INC;//POS_MAXI; //mapToRange(POS_MAXI);
     motor_state[0] = ST_HOMING;
   }
   //M1
   if (motors > 1)
   {
-    targetInput[1] = POS_MAXI;//mapToRange(POS_MAXI);
+    targetInput[1] = HOMING_INC;//mapToRange(POS_MAXI);
     motor_state[1] = ST_HOMING;
   }
   //M2
   if (motors > 2)
   {
-    targetInput[2] = POS_MAXI;//mapToRange(POS_MAXI);
+    targetInput[2] = HOMING_INC;//mapToRange(POS_MAXI);
     motor_state[2] = ST_HOMING;
   }
   //M3
   if (motors > 3)
   {
-    targetInput[3] = POS_MAXI;//mapToRange(POS_MAXI);
+    targetInput[3] = HOMING_INC;//mapToRange(POS_MAXI);
     motor_state[3] = ST_HOMING;
   }
   //
@@ -637,53 +635,123 @@ int homing_start()
     move3(targetInput[3]);
 }
 
+//checks limit reached and changes target position fwd or bkwd
+int homing_limitX(int X, int stp)
+{
+  //do we need to bail out first?
+  if (targetInput[X] == POS_MAXI || targetInput[X] == POS_HOME)
+    return 1;
+  //
+  switch(X)
+  {
+    case 0:
+      if (safe0s == HIGH)
+      {
+        safe0s = LOW;
+        return 1;
+      }
+    break;
+    case 1:
+      if (safe1s == HIGH)
+      {
+        safe1s = LOW;
+        return 1;
+      }
+    break;
+    case 2:
+      if (safe2s == HIGH)
+      {
+        safe2s = LOW;
+        return 1;
+      }
+    break;
+    case 3:
+      if (safe3s == HIGH)
+      {
+        safe3s = LOW;
+        return 1;
+      }
+    break;
+  }
+  //we can move on with step <stp>
+  targetInput[X] += stp;
+  #if 0
+  debug_print ("M");
+  debug_print (X, DEC);
+  debug_print (" moving at ");
+  debug_println (targetInput[X], DEC);
+  #endif
+  return 0;
+}
+
 int homing_checkX(int X)
 {
   static byte mmove_try[MAX_MOTORS];
-  if (motor_state[X] == ST_HOMING)
+  if (targetInput[X] == POS_MAXI || targetInput[X] == POS_HOME)
   {
-    mmove_try[X] = 1;
-    currentPos[X] = POS_MAXI;
-    motor_maxs[X] = currentPos[X];
+    digitalWrite(ena[X], HIGH);//disable motor
     debug_print ("M");
     debug_print (X, DEC);
-    debug_print (" homing at ");
-    debug_println (motor_maxs[X], DEC);
-    targetInput[X] = POS_MAXI - RANGE_DZ;//mapToRange(POS_HOME);
-    //
-    motor_state[X] = ST_MAXING;
+    debug_print (" position ERROR at ");
+    debug_print (targetInput[X], DEC);
+    debug_print (", disabled\n");
+    motor_state[X] = ST_IDLING;
+    //if (motors > X)
+    //  motors = X;
+    return 1;
+  }
+  if (motor_state[X] == ST_HOMING)
+  {
+    if (homing_limitX(X, HOMING_INC))
+    {
+      mmove_try[X] = 1;
+      currentPos[X] = POS_MAXI;
+      motor_maxs[X] = currentPos[X];
+      debug_print ("M");
+      debug_print (X, DEC);
+      debug_print (" homing at ");
+      debug_println (motor_maxs[X], DEC);
+      targetInput[X] = POS_MAXI - HOMING_INC;//mapToRange(POS_HOME);
+      //targetInput[X] = POS_MAXI - RANGE_DZ;//mapToRange(POS_HOME);
+      //
+      motor_state[X] = ST_MAXING;
+    }
   }
   else if (motor_state[X] == ST_MAXING)
   {
-    debug_print ("M");
-    debug_print (X, DEC);
-    debug_print(" maxing at ");
-    debug_println (currentPos[X], DEC);
-    if (currentPos[X] >= POS_MAXI - RANGE_DZ)
+    if (homing_limitX(X, -HOMING_INC))
     {
-      mmove_try[X]++;
-      //try again, keep it moving
-      //since the Treach signal may be triggered several times
-      targetInput[X] = POS_HOME + mmove_try[X];//mapToRange(POS_HOME);
-    }
-    else
-    {
-      mmove_try[X] = 1;
-      motor_mins[X] = currentPos[X];
-      motor_printX(X);
-      uint16_t mtr_range = motor_maxs[X] - motor_mins[X];
-      //adjust range to avoid reaching the mechanical ends
-      motor_mins[X] += RANGE_DZ;
-      motor_maxs[X] -= RANGE_DZ;
-      //check range to be more than a few thousands
-      if ((motor_maxs[X] < motor_mins[X]) || (motor_maxs[X] - motor_mins[X] < RANGE_SAFE))
+      debug_print ("M");
+      debug_print (X, DEC);
+      debug_print(" maxing at ");
+      debug_println (currentPos[X], DEC);
+      if (currentPos[X] >= POS_MAXI - RANGE_DZ)
       {
-        fail_loop();
+        mmove_try[X]++;
+        //try again, keep it moving
+        //since the Treach signal may be triggered several times
+        //targetInput[X] = POS_HOME + mmove_try[X];//mapToRange(POS_HOME);
+        targetInput[X] -= HOMING_INC;//mapToRange(POS_HOME);
       }
-      //
-      targetInput[X] = motor_mins[X]; //range deadzone already computed
-      motor_state[X] = ST_CTRING;
-    }
+      else
+      {
+        mmove_try[X] = 1;
+        motor_mins[X] = currentPos[X];
+        motor_printX(X);
+        uint16_t mtr_range = motor_maxs[X] - motor_mins[X];
+        //adjust range to avoid reaching the mechanical ends
+        motor_mins[X] += RANGE_DZ;
+        motor_maxs[X] -= RANGE_DZ;
+        //check range to be more than a few thousands
+        if ((motor_maxs[X] < motor_mins[X]) || (motor_maxs[X] - motor_mins[X] < RANGE_SAFE))
+        {
+          fail_loop();
+        }
+        //
+        targetInput[X] = motor_mins[X]; //range deadzone already computed
+        motor_state[X] = ST_CTRING;
+      }
+    }//homing limit
   }
   else if (motor_state[X] == ST_CTRING)
   {
@@ -732,35 +800,65 @@ int homing_done()
 {
   int mk = 0;
   //M0
-  if (isRunning[0] == false)
+  if (motors > 0 && isRunning[0] == false)
   {
-    homing_checkX(0);
-    if (motor_state[0] == ST_RUNING)
+    if (motor_state[0] == ST_RUNING || motor_state[0] == ST_IDLING)
       mk++;
+    else
+      homing_checkX(0);
   }
   //M1
-  if (isRunning[1] == false)
+  if (motors > 1 && isRunning[1] == false)
   {
-    homing_checkX(1);
-    if (motor_state[1] == ST_RUNING)
+    if (motor_state[1] == ST_RUNING || motor_state[1] == ST_IDLING)
       mk++;
+    else
+      homing_checkX(1);
   }
   //M2
-  if (isRunning[2] == false)
+  if (motors > 2 && isRunning[2] == false)
   {
-    homing_checkX(2);
-    if (motor_state[2] == ST_RUNING)
+    if (motor_state[2] == ST_RUNING || motor_state[2] == ST_IDLING)
       mk++;
+    else
+      homing_checkX(2);
   }
   //M3
-  if (isRunning[3] == false)
+  if (motors > 3 && isRunning[3] == false)
   {
-    homing_checkX(3);
-    if (motor_state[3] == ST_RUNING)
+    if (motor_state[3] == ST_RUNING || motor_state[3] == ST_IDLING)
       mk++;
+    else
+      homing_checkX(3);
   }
   return (mk == motors)?1:0;
   //return (mk == 1)?1:0;
+}
+
+//keep led low/high a number of 'loops'
+long ledk = 0;
+void ledk_act(long loops)
+{
+  if (ledk < loops)
+  {
+    //debug_print (ledk);
+    //debug_println (" loops, led HIGH");
+    digitalWrite(led_pin, HIGH);
+  }
+  else 
+  {
+    if (ledk > loops && (ledk % loops) == 0)
+    {
+      //debug_print (loops);
+      //debug_println (" loops done!");
+      ledk = 0;
+      return;
+    }
+    //debug_print (ledk);
+    //debug_println (" loops, led LOW");
+    digitalWrite(led_pin, LOW);
+  }
+  ledk++;
 }
 
 void loop()
@@ -791,7 +889,6 @@ void loop()
     break;
     case ST_HOMING:
     {
-      digitalWrite(led_pin, LOW);
       if (homing_done())
       {
         minPeriod = SPD_FASTST;
@@ -816,21 +913,22 @@ void loop()
           //digitalWrite(led_pin, LOW);
           //delay4int (100);
         }
+        digitalWrite(led_pin, HIGH);
+        ledk = 0;
       }
-
-      delay4int (250);
-      digitalWrite(led_pin, HIGH);
-      delay4int (250);
+      else
+        ledk_act(20000/HOMING_INC);
     }
     break;
     case ST_RUNING:
       if (SerialC.available())
       {
-        digitalWrite(led_pin, LOW);
+        //digitalWrite(led_pin, LOW);
+        ledk_act (2);
         command_check ();
       }
       else
-        digitalWrite(led_pin, HIGH);
+        ;//digitalWrite(led_pin, HIGH);
     break;
   }
 }
