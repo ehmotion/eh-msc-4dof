@@ -5,8 +5,22 @@
 Arduino sketch for generating pulses needed to control servo drivers such as the AASD-15A used in the SFX100 project and the pt-actuators.<br>
 The controller is meant for the SFX100 actuator and the likes but it could easily be adapted to other configurations.
 
+# v1 - uses range detection
 The controller will start detecting your actuator limits as soon as it is powered on so make sure you have all required connections ready prior to power on.<br>
+
+# v2 - uses specified stroke
+```
+#define STROKE_LIMIT  100               //100mm limit means we do no homing
+```
+Use the stroke length you want, keep in mind that this should be in line with your actuator stroke so make sure you measure it.
+The circuit section between Arduino pin 18 (19, 20, 21) and DB25 pin 23 can be discarded since no limits detection is performed.
+
+Both versions protect your actuators by not reaching their limit (it reserves 5mm at each end).
+Both versions use 0..65535 positions and maps them to the actuator lenght.
+
+<br>
 The following connections are required:
+
 ```
 AASD-15A
 CN2 DB25 pin / Arduino pin
