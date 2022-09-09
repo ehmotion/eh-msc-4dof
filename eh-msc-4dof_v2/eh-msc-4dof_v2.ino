@@ -550,15 +550,21 @@ void command_check()
   {
     ;
   }
-  if (SerialC.read() == startMark1)
+  em1 = SerialC.read();
+  if (em1 == startMark1)
   {
     debug2_println("CMDm1");
     while (SerialC.available() < 1)
     {
       ;
     }
-    if (SerialC.read() == startMark2)
+    em2 = SerialC.read();
+    if (em2 == startMark2 || em2 == 'h')
     {
+      if (em2 == 'h')
+        minPeriod = SPD_HOMING;//homing speed
+      else
+        minPeriod = SPD_FASTST;//max speed
       while (SerialC.available() < MAX_MOTORS * 2 + 2)
       {
         ;
