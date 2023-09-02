@@ -194,8 +194,8 @@ const int ST_CTRING = 3;
 const int ST_RUNING = 4;
 volatile byte run_state = ST_IDLING;
 const unsigned int POS_HOME = 0;
-const unsigned int POS_CNTR = 32000;    //not scaled, full range
-const unsigned int POS_MAXI = 64000;    //not scaled, full range
+const unsigned int POS_CNTR = 32767;    //not scaled, full range
+const unsigned int POS_MAXI = 65535;    //not scaled, full range
 const unsigned int RANGE_SAFE = 20000;  //safe maximum position, for 100mm stroke
 const unsigned int RANGE_DZ   = 1000;   //dead zone at the end of the range:
                                         // each 200pos means 1 motor rotation, i.e. 5mm stroke
@@ -550,15 +550,21 @@ void command_check()
   {
     ;
   }
-  if (SerialC.read() == startMark1)
+  em1 = SerialC.read();
+  if (em1 == startMark1)
   {
     debug2_println("CMDm1");
     while (SerialC.available() < 1)
     {
       ;
     }
-    if (SerialC.read() == startMark2)
+    em2 = SerialC.read();
+    if (em2 == startMark2 || em2 == 'h')
     {
+      if (em2 == 'h')
+        minPeriod = SPD_HOMING;//homing speed
+      else
+        minPeriod = SPD_FASTST;//max speed
       while (SerialC.available() < MAX_MOTORS * 2 + 2)
       {
         ;
@@ -567,6 +573,16 @@ void command_check()
       targetInput[1] = mapToRangeX(1, SerialC.read() << 8 | SerialC.read());
       targetInput[2] = mapToRangeX(2, SerialC.read() << 8 | SerialC.read());
       targetInput[3] = mapToRangeX(3, SerialC.read() << 8 | SerialC.read());
+      #if 0
+      unsigned int _cpos = ((unsigned int)SerialC.read() << 8) | ((unsigned int)SerialC.read());
+      targetInput[0] = mapToRangeX(0, _cpos);
+      _cpos = ((unsigned int)SerialC.read() << 8) | ((unsigned int)SerialC.read());
+      targetInput[1] = mapToRangeX(1, _cpos);
+      _cpos = ((unsigned int)SerialC.read() << 8) | ((unsigned int)SerialC.read());
+      targetInput[2] = mapToRangeX(2, _cpos);
+      _cpos = ((unsigned int)SerialC.read() << 8) | ((unsigned int)SerialC.read());
+      targetInput[3] = mapToRangeX(3, _cpos);
+      #endif
       //
       em1 = SerialC.read();
       em2 = SerialC.read();
@@ -614,24 +630,26 @@ void motor_parkX(int X)
   debug_print (X, DEC);
   debug_print (" parking at ");
   debug_println (ctr_pos, DEC);
+  //int aa = 127;
   switch (X)
   {
     case 0:
-      targetInput[0] = ctr_pos;
+      //targetInput[0] = mapToRangeX(0, aa<<8|aa);//ctr_pos;
+      targetInput[0] = mapToRangeX(0, POS_CNTR);//ctr_pos;
       move0(targetInput[0]);
-    break;
+      break;
     case 1:
-      targetInput[1] = ctr_pos;
+      targetInput[1] = mapToRangeX(1, POS_CNTR);//ctr_pos;
       move1(targetInput[1]);
-    break;
+      break;
     case 2:
-      targetInput[2] = ctr_pos;
+      targetInput[2] = mapToRangeX(2, POS_CNTR);//ctr_pos;
       move2(targetInput[2]);
-    break;
+      break;
     case 3:
-      targetInput[3] = ctr_pos;
+      targetInput[3] = mapToRangeX(3, POS_CNTR);//ctr_pos;
       move3(targetInput[3]);
-    break;
+      break;
   }
 }
 
@@ -875,8 +893,26 @@ int homing_done()
 
 //keep led low/high a number of 'loops'
 long ledk = 0;
-void ledk_act(long loops)
+long ledkoff = 0; //when din (data in) is 0
+void ledk_act(long loops, byte din)
 {
+  #if 1
+  if (din == 1)
+    ledkoff = 0;
+  else
+  {
+    //no comm for a while, keep LED off
+    if (ledkoff > 100000)
+    {
+      digitalWrite(led_pin, LOW);
+      ledk = 0;
+      return;
+    }
+    ledkoff++;
+    return;
+  }
+  #endif
+  //on or off
   if (ledk < loops)
   {
     //debug_print (ledk);
@@ -955,18 +991,18 @@ void loop()
         ledk = 0;
       }
       else
-        ledk_act(20000/HOMING_INC);
+        ledk_act(20000/HOMING_INC, 1);
     }
     break;
     case ST_RUNING:
       if (SerialC.available())
       {
         //digitalWrite(led_pin, LOW);
-        ledk_act (2);
+        ledk_act (20, 1);//20 is good LED effect for 2ms flow
         command_check ();
       }
       else
-        ;//digitalWrite(led_pin, HIGH);
+        ledk_act (20, 0);
     break;
   }
 }
@@ -989,7 +1025,16 @@ uint16_t cmap_uint16 (uint32_t x, uint32_t in_min, uint32_t in_max, uint32_t out
 //- ditribute the 0..65535 interval to our motor's range
 unsigned int mapToRangeX(int X, unsigned int pos)
 {
-  return cmap_uint16 (pos, POS_HOME, POS_MAXI, motor_mins[X], motor_maxs[X]);
+  unsigned int cpos = cmap_uint16 (pos, POS_HOME, POS_MAXI, motor_mins[X], motor_maxs[X]);
+  #if 0
+  debug_print ("#mapped act ");
+  debug_print (X);
+  debug_print (" at ");
+  debug_print (pos);
+  debug_print (" >> ");
+  debug_println (cpos);
+  #endif
+  return cpos;
 }
 
 unsigned int mapToRange(unsigned int pos)

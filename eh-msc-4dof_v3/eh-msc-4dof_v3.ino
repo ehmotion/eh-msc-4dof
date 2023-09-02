@@ -194,12 +194,12 @@ const int ST_CTRING = 3;
 const int ST_RUNING = 4;
 volatile byte run_state = ST_IDLING;
 const unsigned int POS_HOME = 0;
-const unsigned int POS_CNTR = 32000;    //not scaled, full range
-const unsigned int POS_MAXI = 64000;    //not scaled, full range
+const unsigned int POS_CNTR = 32767;    //not scaled, full range
+const unsigned int POS_MAXI = 65535;    //not scaled, full range
 const unsigned int RANGE_SAFE = 20000;  //safe maximum position, for 100mm stroke
 const unsigned int RANGE_DZ   = 1000;   //dead zone at the end of the range:
                                         // each 200pos means 1 motor rotation, i.e. 5mm stroke
-#define STROKE_LIMIT  100               //100mm limit means we do no homing. use 0 for homing,
+#define STROKE_LIMIT  100               // 100mm limit means we do no homing. use 0 for homing,
                                         // use other values at your own risk(!!!) but check RANGE_SAFE above
 const unsigned int HOME_DELAY = 2000;
 volatile byte motor_state[] = {ST_IDLING, ST_IDLING, ST_IDLING, ST_IDLING};
@@ -621,19 +621,19 @@ void motor_parkX(int X)
   switch (X)
   {
     case 0:
-      targetInput[0] = ctr_pos;
+      targetInput[0] = mapToRangeX(0, POS_CNTR);//ctr_pos;
       move0(targetInput[0]);
     break;
     case 1:
-      targetInput[1] = ctr_pos;
+      targetInput[1] = mapToRangeX(1, POS_CNTR);//ctr_pos;
       move1(targetInput[1]);
     break;
     case 2:
-      targetInput[2] = ctr_pos;
+      targetInput[2] = mapToRangeX(2, POS_CNTR);//ctr_pos;
       move2(targetInput[2]);
     break;
     case 3:
-      targetInput[3] = ctr_pos;
+      targetInput[3] = mapToRangeX(3, POS_CNTR);//ctr_pos;
       move3(targetInput[3]);
     break;
   }
@@ -879,8 +879,26 @@ int homing_done()
 
 //keep led low/high a number of 'loops'
 long ledk = 0;
-void ledk_act(long loops)
+long ledkoff = 0; //when din (data in) is 0
+void ledk_act(long loops, byte din)
 {
+  #if 1
+  if (din == 1)
+    ledkoff = 0;
+  else
+  {
+    //no comm for a while, keep LED off
+    if (ledkoff > 100000)
+    {
+      digitalWrite(led_pin, LOW);
+      ledk = 0;
+      return;
+    }
+    ledkoff++;
+    return;
+  }
+  #endif
+  //on or off
   if (ledk < loops)
   {
     //debug_print (ledk);
@@ -959,18 +977,18 @@ void loop()
         ledk = 0;
       }
       else
-        ledk_act(20000/HOMING_INC);
+        ledk_act(20000/HOMING_INC, 1);
     }
     break;
     case ST_RUNING:
       if (SerialC.available())
       {
         //digitalWrite(led_pin, LOW);
-        ledk_act (2);
+        ledk_act (20, 1);//20 is good LED effect for 2ms flow
         command_check ();
       }
       else
-        ;//digitalWrite(led_pin, HIGH);
+        ledk_act (20, 0);
     break;
   }
 }
